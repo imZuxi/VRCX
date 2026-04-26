@@ -16,6 +16,9 @@
         DropdownMenuTrigger
     } from '@/components/ui/dropdown-menu';
     import { Dialog, DialogContent } from '@/components/ui/dialog';
+    import { ArrowLeft } from 'lucide-vue-next';
+    import { Button } from '@/components/ui/button';
+    import { TooltipWrapper } from '@/components/ui/tooltip';
     import { computed } from 'vue';
     import { storeToRefs } from 'pinia';
 
@@ -106,11 +109,11 @@
     const dialogClass = computed(() => {
         switch (activeType.value) {
             case 'world':
-                return 'x-dialog x-world-dialog translate-y-0 sm:max-w-235';
+                return 'x-dialog translate-y-0 sm:max-w-235 overflow-hidden flex flex-col';
             case 'avatar':
-                return 'x-dialog x-avatar-dialog sm:max-w-235 translate-y-0';
+                return 'x-dialog sm:max-w-235 translate-y-0 overflow-hidden flex flex-col';
             case 'group':
-                return 'x-dialog x-group-dialog group-body translate-y-0 sm:max-w-235';
+                return 'x-dialog translate-y-0 sm:max-w-235 overflow-hidden flex flex-col';
             case 'previous-instances-info':
             case 'previous-instances-user':
             case 'previous-instances-world':
@@ -118,7 +121,7 @@
                 return 'x-dialog translate-y-0 sm:max-w-250';
             case 'user':
             default:
-                return 'x-dialog x-user-dialog sm:max-w-235 translate-y-0';
+                return 'x-dialog sm:max-w-235 translate-y-0 overflow-hidden flex flex-col';
         }
     });
 
@@ -130,6 +133,13 @@
         }
         return dialogCrumbs.value.slice(1, -2);
     });
+    const backCrumbLabel = computed(() => {
+        if (dialogCrumbs.value.length < 2) {
+            return '';
+        }
+        const backCrumb = dialogCrumbs.value[dialogCrumbs.value.length - 2];
+        return backCrumb?.label || backCrumb?.id || '';
+    });
 
     function handleBreadcrumbClick(index) {
         uiStore.handleBreadcrumbClick(index);
@@ -139,18 +149,30 @@
 <template>
     <Dialog v-if="isOpen" v-model:open="isOpen">
         <DialogContent :class="dialogClass" style="top: 10vh" :show-close-button="false">
-            <Breadcrumb v-if="shouldShowBreadcrumbs" class="mb-2">
+            <Breadcrumb v-if="shouldShowBreadcrumbs" class="mb-2 flex-shrink-0">
                 <BreadcrumbList>
+                    <TooltipWrapper :content="backCrumbLabel" :disabled="!backCrumbLabel" :delayDuration="500">
+                        <Button variant="ghost" size="icon-sm" @click="handleBreadcrumbClick(dialogCrumbs.length - 2)">
+                            <ArrowLeft />
+                            <span class="sr-only">{{ backCrumbLabel }}</span>
+                        </Button>
+                    </TooltipWrapper>
                     <template v-if="shouldCollapseBreadcrumbs">
                         <BreadcrumbItem>
-                            <BreadcrumbLink as-child>
-                                <button
-                                    type="button"
-                                    class="max-w-40 truncate text-left"
-                                    @click="handleBreadcrumbClick(0)">
-                                    {{ dialogCrumbs[0]?.label || dialogCrumbs[0]?.id }}
-                                </button>
-                            </BreadcrumbLink>
+                            <TooltipWrapper
+                                :content="dialogCrumbs[0]?.label || dialogCrumbs[0]?.id"
+                                :delayDuration="500">
+                                <BreadcrumbLink as-child>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="max-w-40 justify-start truncate text-left"
+                                        @click="handleBreadcrumbClick(0)">
+                                        {{ dialogCrumbs[0]?.label || dialogCrumbs[0]?.id }}
+                                    </Button>
+                                </BreadcrumbLink>
+                            </TooltipWrapper>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
@@ -170,17 +192,26 @@
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
-                            <BreadcrumbLink as-child>
-                                <button
-                                    type="button"
-                                    class="max-w-40 truncate text-left"
-                                    @click="handleBreadcrumbClick(dialogCrumbs.length - 2)">
-                                    {{
-                                        dialogCrumbs[dialogCrumbs.length - 2]?.label ||
-                                        dialogCrumbs[dialogCrumbs.length - 2]?.id
-                                    }}
-                                </button>
-                            </BreadcrumbLink>
+                            <TooltipWrapper
+                                :content="
+                                    dialogCrumbs[dialogCrumbs.length - 2]?.label ||
+                                    dialogCrumbs[dialogCrumbs.length - 2]?.id
+                                "
+                                :delayDuration="500">
+                                <BreadcrumbLink as-child>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        class="max-w-40 justify-start truncate text-left"
+                                        @click="handleBreadcrumbClick(dialogCrumbs.length - 2)">
+                                        {{
+                                            dialogCrumbs[dialogCrumbs.length - 2]?.label ||
+                                            dialogCrumbs[dialogCrumbs.length - 2]?.id
+                                        }}
+                                    </Button>
+                                </BreadcrumbLink>
+                            </TooltipWrapper>
                         </BreadcrumbItem>
                         <BreadcrumbSeparator />
                         <BreadcrumbItem>
@@ -195,14 +226,21 @@
                     <template v-else>
                         <template v-for="(crumb, index) in dialogCrumbs" :key="`${crumb.type}-${crumb.id}`">
                             <BreadcrumbItem>
-                                <BreadcrumbLink v-if="index < dialogCrumbs.length - 1" as-child>
-                                    <button
-                                        type="button"
-                                        class="max-w-40 truncate text-left"
-                                        @click="handleBreadcrumbClick(index)">
-                                        {{ crumb.label || crumb.id }}
-                                    </button>
-                                </BreadcrumbLink>
+                                <TooltipWrapper
+                                    v-if="index < dialogCrumbs.length - 1"
+                                    :content="crumb.label || crumb.id"
+                                    :delayDuration="500">
+                                    <BreadcrumbLink as-child>
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            class="max-w-40 justify-start truncate text-left"
+                                            @click="handleBreadcrumbClick(index)">
+                                            {{ crumb.label || crumb.id }}
+                                        </Button>
+                                    </BreadcrumbLink>
+                                </TooltipWrapper>
                                 <BreadcrumbPage v-else class="max-w-40 truncate">
                                     {{ crumb.label || crumb.id }}
                                 </BreadcrumbPage>

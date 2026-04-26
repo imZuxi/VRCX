@@ -7,7 +7,7 @@ import {
     getGroupName,
     getWorldName
 } from '../shared/utils';
-import { database } from '../service/database';
+import { database } from '../services/database';
 import { useFriendStore } from './friend';
 import { useInstanceStore } from './instance';
 import { useLocationStore } from './location';
@@ -16,7 +16,7 @@ import { useNotificationStore } from './notification';
 import { useNotificationsSettingsStore } from './settings/notifications';
 import { useUserStore } from './user';
 import { useWristOverlaySettingsStore } from './settings/wristOverlay';
-import { watchState } from '../service/watchState';
+import { watchState } from '../services/watchState';
 
 export const useSharedFeedStore = defineStore('SharedFeed', () => {
     const friendStore = useFriendStore();
@@ -93,9 +93,9 @@ export const useSharedFeedStore = defineStore('SharedFeed', () => {
     );
 
     watch(
-        () => watchState.isLoggedIn,
-        (isLoggedIn) => {
-            if (isLoggedIn) {
+        () => [watchState.isFriendsLoaded, watchState.isFavoritesLoaded],
+        ([isFriendsLoaded, isFavoritesLoaded]) => {
+            if (isFriendsLoaded && isFavoritesLoaded) {
                 sharedFeedData.value = [];
                 loadSharedFeed();
             }
@@ -356,7 +356,7 @@ export const useSharedFeedStore = defineStore('SharedFeed', () => {
         const wristFilter = notificationsSettingsStore.sharedFeedFilters.wrist;
         // BlockedOnPlayerJoined, BlockedOnPlayerLeft, MutedOnPlayerJoined, MutedOnPlayerLeft
         for (const ref of moderationStore.cachedPlayerModerations.values()) {
-            if (ref.sourceUserId !== ctx.userId) {
+            if (ref.targetUserId !== ctx.userId) {
                 continue;
             }
 

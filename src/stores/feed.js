@@ -1,24 +1,22 @@
 import { ref, shallowRef, watch } from 'vue';
 import { defineStore } from 'pinia';
 
-import { database } from '../service/database';
+import { database } from '../services/database';
 import { useFriendStore } from './friend';
-import { useNotificationStore } from './notification';
-import { useSharedFeedStore } from './sharedFeed';
 import { useVrcxStore } from './vrcx';
-import { watchState } from '../service/watchState';
+import { watchState } from '../services/watchState';
 
-import configRepository from '../service/config';
+import configRepository from '../services/config';
 
 export const useFeedStore = defineStore('Feed', () => {
     const friendStore = useFriendStore();
-    const notificationStore = useNotificationStore();
     const vrcxStore = useVrcxStore();
-    const sharedFeedStore = useSharedFeedStore();
 
     const feedTableData = shallowRef([]);
     const feedTable = ref({
         search: '',
+        dateFrom: '',
+        dateTo: '',
         vip: false,
         loading: false,
         filter: [],
@@ -59,7 +57,7 @@ export const useFeedStore = defineStore('Feed', () => {
     init();
 
     function feedSearch(row) {
-        const value = feedTable.value.search.toUpperCase();
+        const value = feedTable.value.search.trim().toUpperCase();
         if (!value) {
             return true;
         }
@@ -140,30 +138,40 @@ export const useFeedStore = defineStore('Feed', () => {
             feedTable.value.vip
         );
         feedTable.value.loading = true;
-        let vipList = [];
-        if (feedTable.value.vip) {
-            vipList = Array.from(friendStore.localFavoriteFriends.values());
+        try {
+            let vipList = [];
+            if (feedTable.value.vip) {
+                vipList = Array.from(friendStore.localFavoriteFriends.values());
+            }
+            const search = feedTable.value.search.trim();
+            const { dateFrom, dateTo } = feedTable.value;
+            const rows =
+                search || dateFrom || dateTo
+                    ? await database.searchFeedDatabase(
+                          search,
+                          feedTable.value.filter,
+                          vipList,
+                          vrcxStore.searchLimit,
+                          dateFrom,
+                          dateTo
+                      )
+                    : await database.lookupFeedDatabase(
+                          feedTable.value.filter,
+                          vipList
+                      );
+            feedTableData.value = [];
+            feedTableData.value = [...feedTableData.value, ...rows];
+        } finally {
+            feedTable.value.loading = false;
         }
-        const search = feedTable.value.search.trim();
-        const rows = search
-            ? await database.searchFeedDatabase(
-                  search,
-                  feedTable.value.filter,
-                  vipList,
-                  vrcxStore.searchLimit
-              )
-            : await database.lookupFeedDatabase(
-                  feedTable.value.filter,
-                  vipList
-              );
-        feedTableData.value = [];
-        feedTableData.value = [...feedTableData.value, ...rows];
-        feedTable.value.loading = false;
     }
 
-    function addFeed(feed) {
-        notificationStore.queueFeedNoty(feed);
-        sharedFeedStore.addEntry(feed);
+    /**
+     * Appends a feed entry to the local table if it passes filters.
+     * Does NOT trigger notifications or shared feed — that is the caller's responsibility.
+     * @param {object} feed The feed entry to add.
+     */
+    function addFeedEntry(feed) {
         if (
             feedTable.value.filter.length > 0 &&
             !feedTable.value.filter.includes(feed.type)
@@ -177,6 +185,18 @@ export const useFeedStore = defineStore('Feed', () => {
             return;
         }
         if (!feedSearch(feed)) {
+            return;
+        }
+        if (
+            feedTable.value.dateFrom &&
+            feed.created_at < feedTable.value.dateFrom
+        ) {
+            return;
+        }
+        if (
+            feedTable.value.dateTo &&
+            feed.created_at > feedTable.value.dateTo
+        ) {
             return;
         }
         feedTableData.value = [feed, ...feedTableData.value];
@@ -201,6 +221,6 @@ export const useFeedStore = defineStore('Feed', () => {
         feedTableData,
         initFeedTable,
         feedTableLookup,
-        addFeed
+        addFeedEntry
     };
 });
